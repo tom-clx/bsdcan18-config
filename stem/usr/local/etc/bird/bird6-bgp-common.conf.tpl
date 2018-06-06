@@ -7,39 +7,6 @@
 # If you do, your changes will get nuked by the next ansible run!         #
 ###########################################################################
 
-# This configuration file includes configuration that is common for all BGP
-# speakers (v6 only). Not all is used on all routers.
-
-## Shared functions
-
-# Functions and filters for BGP routes. Based on the recommended practices laid
-# out in the BIRD filtering example.
-# https://gitlab.labs.nic.cz/bird/wikis/BGP_filtering
-
-function rt_import_all(int asn) {
-	# A more permissive function to handle prefixes received from uplinks.
-	# We will not know about all of the prefixes we receive.
-
-	# The first hop in the path must match the ASN of the sending router.
-	if bgp_path.first != asn then return false;
-	# Path must be no longer than 64.
-	if bgp_path.len > 64 then return false;
-	# Next hop IP must match router sending route.
-	if bgp_next_hop != from then return false;
-	# If all else fails, route is okay.
-	return true;
-}
-
-function rt_import_rs(int asn) {
-	# An even more permissive function, for processing updates from route
-	# servers. The adjacency checks are meaningless here.
-
-	# Path must be no longer than 64.
-	if bgp_path.len > 64 then return false;
-	# If all else fails, route is okay.
-	return true;
-}
-
 ## Protocol templates
 
 template bgp ebgp6 {
@@ -71,7 +38,9 @@ template bgp ebgp6 {
         # Allow the local AS to appear once in the ASpath. This is a hack
         # to simply allow us to see opposite site prefixes via eBGP, without
         # iBGP sessions, a PtP link, etc.
-        allow local as 1;
+	# NOTE: Changed to 10 for the benefit of demonstration.
+        #allow local as 1;
+        allow local as 10;
 {% endif %}
 
 	{% if nerf_me is defined and nerf_me %}
@@ -95,7 +64,7 @@ template bgp ebgp6 {
 	};
         # Export exactly what prefixes we want advertised. No surprises.
         export filter {
-                if proto = "static_bgp_v6" || proto = "standby_bgp_v6" || proto = "portable_bgp_v6" && net.len <= 48 then {
+                if proto = "static_bgp_v6" || proto = "portable_bgp_v6" && net.len <= 48 then {
 			{% if nerf_me is defined and nerf_me %}
 			# These lines cause our AS to be prepended 5 times, in
 			# hope of preventing the BGP instance from being
